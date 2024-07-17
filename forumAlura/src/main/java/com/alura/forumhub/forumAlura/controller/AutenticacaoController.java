@@ -1,55 +1,36 @@
 package com.alura.forumhub.forumAlura.controller;
 
-
-import com.alura.forumhub.forumAlura.topicos.*;
-import jakarta.transaction.Transactional;
+import com.alura.forumhub.forumAlura.infra.DadosTokenJWT;
+import com.alura.forumhub.forumAlura.infra.TokenService;
+import com.alura.forumhub.forumAlura.usuario.DadosAutenticacao;
+import com.alura.forumhub.forumAlura.usuario.Usuario;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.util.UriBuilder;
-import org.springframework.web.util.UriComponentsBuilder;
-
-import java.util.List;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("topicos")
-public class topicosController {
+@RequestMapping("/login")
+public class AutenticacaoController {
 
     @Autowired
-    private TopicosRepository repository;
+    private AuthenticationManager manager;
+
+    @Autowired
+    private TokenService tokenService;
 
     @PostMapping
-    @Transactional
-    public ResponseEntity cadastar(@RequestBody @Valid dadosCadastroTopico dados, UriComponentsBuilder uriBuilder){
-        var topico = new Topico(dados);
-        repository.save(topico);
-        var uri = uriBuilder.path("/topicos/{id}").buildAndExpand(topico.getId()).toUri();
+    public ResponseEntity efetuarLogin(@RequestBody @Valid DadosAutenticacao dados){
+        var autehenticationToken = new UsernamePasswordAuthenticationToken(dados.login(), dados.senha());
+        var authentication = manager.authenticate(autehenticationToken);
 
-        return ResponseEntity.created(uri).body(new DadosDetalhamentoTopico (topico));
-    }
+        var tokenJWT = tokenService.gerarToken((Usuario) authentication.getPrincipal());
 
-    @GetMapping
-    public ResponseEntity<Page<DadosListagemTopico>> listar(Pageable paginacao){
-        var page = repository.findAllByAtivoTrue(paginacao).map(DadosListagemTopico::new);
-        return ResponseEntity.ok(page);
-    }
-
-
-    @PutMapping
-    @Transactional
-    public ResponseEntity atualizar(@RequestBody @Valid DadosAtualizacaoTopico atualizar){
-        var topico = repository.getReferenceById(atualizar.id());
-        topico.atulizarInformacoes(atualizar);
-
-        return ResponseEntity.ok(new DadosDetalhamentoTopico (topico));
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity detalhar(@PathVariable Long id){
-        var topico = repository.getReferenceById(id);
-        return ResponseEntity.ok(new DadosDetalhamentoTopico(topico));
+        return ResponseEntity.ok(new DadosTokenJWT(tokenJWT));
     }
 }
